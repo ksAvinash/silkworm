@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { QRCodeSVG } from 'qrcode.react';
 import { getDb } from '@/lib/firebase';
@@ -12,7 +13,17 @@ import { Badge, EmptyState, ErrorNote, Field, Modal, Spinner } from '@/component
 const STATUS_TONE = { booked: 'amber', allocated: 'blue', delivered: 'green' } as const;
 
 export default function OrdersPage() {
+  return (
+    <Suspense fallback={<Spinner label="Loading bookings…" />}>
+      <OrdersContent />
+    </Suspense>
+  );
+}
+
+function OrdersContent() {
   const { tenantId, user } = useAuth();
+  const router = useRouter();
+  const batchFilter = useSearchParams().get('batch');
   const [orders, loading] = useTenantCollection<Order>(tenantId, 'orders');
   const [batches] = useTenantCollection<Batch>(tenantId, 'batches');
   const [farmers] = useTenantCollection<Farmer>(tenantId, 'farmers');
@@ -93,7 +104,11 @@ export default function OrdersPage() {
     await cancelOrder(tenantId, order);
   };
 
-  const shown = filter === 'all' ? orders : orders.filter((o) => o.status === filter);
+  const inBatch = batchFilter ? orders.filter((o) => o.batchId === batchFilter) : orders;
+  const shown = filter === 'all' ? inBatch : inBatch.filter((o) => o.status === filter);
+  const filteredBatch = batchFilter ? batches.find((b) => b.id === batchFilter) : undefined;
+  const filteredBatchName =
+    (filteredBatch && batchLabel(filteredBatch)) || inBatch[0]?.batchLabel || 'this batch';
   const selectedBatch = batches.find((b) => b.id === form.batchId);
   const remaining = selectedBatch
     ? selectedBatch.quantity - selectedBatch.bookedTotal
@@ -107,6 +122,39 @@ export default function OrdersPage() {
           + New booking
         </button>
       </div>
+
+      {batchFilter && (
+        <div
+          className="card"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap',
+            padding: '12px 16px',
+            marginBottom: 14,
+          }}
+        >
+          <span>
+            Bookings for <strong>{filteredBatchName}</strong>
+          </span>
+          <span className="muted">
+            {inBatch.length} booking{inBatch.length === 1 ? '' : 's'} ·{' '}
+            {inBatch.reduce((s, o) => s + o.quantity, 0).toLocaleString()} qty
+            {filteredBatch &&
+              ` of ${filteredBatch.quantity.toLocaleString()} (${
+                filteredBatch.quantity - filteredBatch.bookedTotal
+              } left)`}
+          </span>
+          <span style={{ flex: 1 }} />
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => router.replace('/admin/orders/')}
+          >
+            Show all bookings
+          </button>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
         {(['all', 'booked', 'allocated', 'delivered'] as const).map((s) => (
@@ -125,9 +173,15 @@ export default function OrdersPage() {
         <Spinner label="Loading bookings…" />
       ) : shown.length === 0 ? (
         <EmptyState
-          title={filter === 'all' ? 'No bookings yet' : `No ${filter} orders`}
+          title={
+            batchFilter && filter === 'all'
+              ? 'No bookings for this batch yet'
+              : filter === 'all'
+                ? 'No bookings yet'
+                : `No ${filter} orders`
+          }
           hint={
-            filter === 'all'
+            filter === 'all' && !batchFilter
               ? 'When a farmer calls in, record their booking against an open batch here.'
               : undefined
           }

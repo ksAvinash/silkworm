@@ -110,17 +110,21 @@ export default function BatchesPage() {
                 return (
                   <tr key={b.id}>
                     <td>
-                      <strong>{b.breedName}</strong> — {b.quantity.toLocaleString()} qty —{' '}
-                      {b.availableDate}
+                      <Link href={`/admin/orders/?batch=${b.id}`} title="View bookings for this batch">
+                        <strong>{b.breedName}</strong> — {b.quantity.toLocaleString()} qty —{' '}
+                        {b.availableDate}
+                      </Link>
                       {b.notes && <div className="muted">{b.notes}</div>}
                     </td>
                     <td>
-                      <div className="progress" title={`${Math.round(pct)}% booked`}>
-                        <span style={{ width: `${pct}%` }} />
-                      </div>
-                      <span className="muted">
-                        {b.bookedTotal.toLocaleString()} / {b.quantity.toLocaleString()}
-                      </span>
+                      <Link href={`/admin/orders/?batch=${b.id}`} title="View bookings for this batch">
+                        <div className="progress" title={`${Math.round(pct)}% booked`}>
+                          <span style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="muted">
+                          {b.bookedTotal.toLocaleString()} / {b.quantity.toLocaleString()}
+                        </span>
+                      </Link>
                     </td>
                     <td>
                       {full ? (
@@ -133,6 +137,9 @@ export default function BatchesPage() {
                     </td>
                     <td>
                       <div className="actions">
+                        <Link href={`/admin/orders/?batch=${b.id}`} className="btn btn-ghost btn-sm">
+                          Bookings
+                        </Link>
                         <button className="btn btn-ghost btn-sm" onClick={() => toggleBooking(b)}>
                           {b.bookingOpen ? 'Close booking' : 'Open booking'}
                         </button>
