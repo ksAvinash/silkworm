@@ -1,0 +1,51 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isSuper() {
+      return signedIn() && request.auth.token.superAdmin == true;
+    }
+    function isTenantAdmin(tenantId) {
+      return signedIn() && request.auth.token.tenantId == tenantId;
+    }
+
+    // Tenant metadata: the tenant's own admin may read it and bump the
+    // invoice counter; only the super admin creates/manages tenants.
+    match /tenants/{tenantId} {
+      allow read: if isTenantAdmin(tenantId) || isSuper();
+      allow create: if isSuper();
+      allow update: if isSuper() || isTenantAdmin(tenantId);
+      allow delete: if false;
+
+      // All tenant-scoped data (breeds, batches, farmers, orders) is only
+      // visible to that tenant's admin — multi-tenancy enforced here.
+      match /{subcollection}/{docId} {
+        allow read, write: if isTenantAdmin(tenantId);
+      }
+    }
+
+    // Public invoice-verification snapshots. Direct GET by code only (the
+    // code is the unguessable capability); listing is never allowed.
+    match /verifications/{code} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if signedIn()
+        && request.auth.token.tenantId == request.resource.data.tenantId;
+      allow update, delete: if false;
+    }
+
+    // Account registries are managed by Cloud Functions (Admin SDK).
+    match /admins/{uid} {
+      allow read: if isSuper() || (signedIn() && request.auth.uid == uid);
+      allow write: if false;
+    }
+    match /superAdmins/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+  }
+}
