@@ -1,11 +1,10 @@
 import type { Metadata, Viewport } from 'next';
-import { Fraunces, Manrope } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/lib/auth';
 import './globals.css';
 
 // Self-hosted at build time by next/font — no runtime font requests.
-const manrope = Manrope({ subsets: ['latin'], variable: '--font-body' });
-const fraunces = Fraunces({ subsets: ['latin'], variable: '--font-display' });
+const inter = Inter({ subsets: ['latin'], variable: '--font-body' });
 
 export const metadata: Metadata = {
   title: {
@@ -19,12 +18,12 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#2e6b40',
+  themeColor: '#1a7a41',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${manrope.variable} ${fraunces.variable}`}>
+    <html lang="en" className={inter.variable}>
       <body>
         <AuthProvider>{children}</AuthProvider>
       </body>
