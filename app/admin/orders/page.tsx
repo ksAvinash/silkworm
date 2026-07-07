@@ -262,10 +262,10 @@ export default function OrdersPage() {
         </Modal>
       )}
 
-      {invoiceFor?.verifyCode && (
+      {invoiceFor?.verifyCode && tenantId && (
         <Modal title={`Invoice ${invoiceFor.invoiceNo}`} onClose={() => setInvoiceFor(null)}>
           <div className="qr-box">
-            <QRCodeSVG value={verifyUrl(invoiceFor.verifyCode)} size={196} marginSize={2} />
+            <QRCodeSVG value={verifyUrl(tenantId, invoiceFor.verifyCode)} size={196} marginSize={2} />
             <div>
               <strong>{invoiceFor.farmerName}</strong>
               <div className="muted">
@@ -278,7 +278,7 @@ export default function OrdersPage() {
             </p>
             <a
               className="btn btn-ghost btn-sm"
-              href={verifyUrl(invoiceFor.verifyCode)}
+              href={verifyUrl(tenantId, invoiceFor.verifyCode)}
               target="_blank"
               rel="noreferrer"
             >

@@ -164,12 +164,16 @@ each rearer's data is isolated by construction:
 - `tenants/{tenantId}/orders` — a farmer's phone-in pre-booking against an
   open batch (allocation, delivery status, invoice/QR reference, which admin
   booked it)
+- `tenants/{tenantId}/verifications` — public read-only invoice snapshots,
+  fetched by unguessable code when an invoice QR is scanned
 
 Platform-level (non-tenant-scoped) data:
 
-- `admins` — tenant admin accounts, keyed by Firebase Auth UID, each tagged
-  with the `tenantId` they belong to
-- `superAdmins` — platform super-admin accounts, keyed by Firebase Auth UID
+- `users` — one doc per account, keyed by Firebase Auth UID:
+  `{ role: superadmin | admin | farmer (future), phone, tenantId? }`.
+  Managed only by Cloud Functions; `syncClaims` mirrors it into auth custom
+  claims (with a phone-number fallback that self-heals if an auth user is
+  deleted and re-created with a new UID).
 
 ## Roadmap (future releases)
 

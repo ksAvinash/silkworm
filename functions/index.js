@@ -3,18 +3,22 @@ const admin = require('firebase-admin');
 
 admin.initializeApp();
 
-// Must match FUNCTIONS_REGION in lib/firebase.ts.
 const REGION = 'asia-south1';
+
+function isSuperToken(token) {
+  // token.superAdmin is the legacy claim shape, accepted during transition.
+  return token?.role === 'superadmin' || token?.superAdmin === true;
+}
 
 /**
  * Onboard a new tenant (super admin only).
  *
  * Creates the tenant document, creates (or reuses) the Firebase Auth user for
- * the tenant admin's phone number, sets the `tenantId` custom claim on that
- * user, and registers them in /admins.
+ * the tenant admin's phone number, sets role custom claims on that user, and
+ * registers them in /users.
  */
 exports.onboardTenant = onCall({ region: REGION }, async (request) => {
-  if (request.auth?.token?.superAdmin !== true) {
+  if (!isSuperToken(request.auth?.token)) {
     throw new HttpsError('permission-denied', 'Only the platform super admin can onboard tenants.');
   }
 
@@ -34,8 +38,8 @@ exports.onboardTenant = onCall({ region: REGION }, async (request) => {
   } catch {
     user = await auth.createUser({ phoneNumber: adminPhone });
   }
-  if (user.customClaims?.tenantId) {
-    throw new HttpsError('already-exists', 'This phone number is already the admin of another tenant.');
+  if (user.customClaims?.role) {
+    throw new HttpsError('already-exists', 'This phone number already has a role on the platform.');
   }
 
   const tenantRef = db.collection('tenants').doc();
@@ -48,8 +52,9 @@ exports.onboardTenant = onCall({ region: REGION }, async (request) => {
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  await auth.setCustomUserClaims(user.uid, { tenantId: tenantRef.id });
-  await db.collection('admins').doc(user.uid).set({
+  await auth.setCustomUserClaims(user.uid, { role: 'admin', tenantId: tenantRef.id });
+  await db.collection('users').doc(user.uid).set({
+    role: 'admin',
     phone: adminPhone,
     tenantId: tenantRef.id,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -59,13 +64,13 @@ exports.onboardTenant = onCall({ region: REGION }, async (request) => {
 });
 
 /**
- * Mirror the caller's recorded role into their auth custom claims.
+ * Mirror the caller's recorded role (/users/{uid}) into their auth custom
+ * claims. /users is Admin-SDK-only (client writes are denied by Firestore
+ * rules), so it's safe to trust as the role source.
  *
- * /superAdmins/{uid} → { superAdmin: true }; otherwise /admins/{uid} →
- * { tenantId }. Both collections are Admin-SDK-only (client writes are
- * denied by Firestore rules), so they're safe to trust as the role source.
- * Lets a super admin bootstrap their claim from a console-created doc, and
- * heals tokens when claims were set after the user signed in.
+ * If no /users doc exists for this uid, falls back to a lookup by the
+ * token's verified phone number and re-keys the profile — this self-heals
+ * the case where an auth user was deleted and re-created with a new uid.
  */
 exports.syncClaims = onCall({ region: REGION }, async (request) => {
   if (!request.auth?.uid) {
@@ -73,25 +78,42 @@ exports.syncClaims = onCall({ region: REGION }, async (request) => {
   }
   const uid = request.auth.uid;
   const db = admin.firestore();
+  const users = db.collection('users');
 
-  let claims = null;
-  const superDoc = await db.collection('superAdmins').doc(uid).get();
-  if (superDoc.exists) {
-    claims = { superAdmin: true };
-  } else {
-    const adminDoc = await db.collection('admins').doc(uid).get();
-    const tenantId = adminDoc.exists ? adminDoc.data().tenantId : null;
-    if (tenantId) claims = { tenantId };
+  let snap = await users.doc(uid).get();
+
+  if (!snap.exists) {
+    const phone = String(request.auth.token.phone_number ?? '').trim();
+    if (phone) {
+      const byPhone = await users.where('phone', '==', phone).limit(1).get();
+      if (!byPhone.empty) {
+        await users.doc(uid).set(byPhone.docs[0].data());
+        await byPhone.docs[0].ref.delete();
+        snap = await users.doc(uid).get();
+      }
+    }
   }
-  if (!claims) {
-    throw new HttpsError('permission-denied', 'No admin role is recorded for this account.');
+  if (!snap.exists) {
+    throw new HttpsError('permission-denied', 'No role is recorded for this account.');
+  }
+
+  const { role, tenantId } = snap.data();
+  let claims;
+  if (role === 'superadmin') {
+    claims = { role: 'superadmin' };
+  } else if (role === 'admin' && tenantId) {
+    claims = { role: 'admin', tenantId };
+  } else {
+    throw new HttpsError('permission-denied', 'User role is invalid.');
   }
 
   const user = await admin.auth().getUser(uid);
   const current = user.customClaims || {};
-  const drifted = Object.entries(claims).some(([key, value]) => current[key] !== value);
+  const drifted =
+    Object.entries(claims).some(([key, value]) => current[key] !== value) ||
+    Object.keys(current).length !== Object.keys(claims).length;
   if (drifted) {
-    await admin.auth().setCustomUserClaims(uid, { ...current, ...claims });
+    await admin.auth().setCustomUserClaims(uid, claims);
   }
   return { ok: true, claims };
 });

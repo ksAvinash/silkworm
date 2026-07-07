@@ -10,18 +10,19 @@ import { Logo, Spinner } from '@/components/ui';
 
 function VerifyContent() {
   const params = useSearchParams();
+  const tenantId = params.get('t');
   const code = params.get('c');
   const [state, setState] = useState<'loading' | 'ok' | 'notfound' | 'nocode'>(
-    code ? 'loading' : 'nocode',
+    tenantId && code ? 'loading' : 'nocode',
   );
   const [data, setData] = useState<Verification | null>(null);
 
   useEffect(() => {
-    if (!code || !firebaseReady) {
-      if (code && !firebaseReady) setState('notfound');
+    if (!tenantId || !code || !firebaseReady) {
+      if (tenantId && code && !firebaseReady) setState('notfound');
       return;
     }
-    getDoc(doc(getDb(), 'verifications', code))
+    getDoc(doc(getDb(), 'tenants', tenantId, 'verifications', code))
       .then((snap) => {
         if (snap.exists()) {
           setData(snap.data() as Verification);
@@ -31,7 +32,7 @@ function VerifyContent() {
         }
       })
       .catch(() => setState('notfound'));
-  }, [code]);
+  }, [tenantId, code]);
 
   if (state === 'loading') return <Spinner label="Verifying order…" />;
 

@@ -117,7 +117,7 @@ export async function deliverOrder(opts: {
   const tenantRef = doc(db, 'tenants', opts.tenantId);
   const orderRef = doc(db, 'tenants', opts.tenantId, 'orders', opts.order.id);
   const verifyCode = randomCode();
-  const verifyRef = doc(db, 'verifications', verifyCode);
+  const verifyRef = doc(db, 'tenants', opts.tenantId, 'verifications', verifyCode);
 
   let invoiceNo = '';
   await runTransaction(db, async (tx) => {
@@ -146,7 +146,7 @@ export async function deliverOrder(opts: {
 }
 
 /** Absolute URL of the public verification page for a code. */
-export function verifyUrl(code: string): string {
+export function verifyUrl(tenantId: string, code: string): string {
   const base = process.env.NEXT_PUBLIC_BASE_PATH || '';
-  return `${window.location.origin}${base}/verify/?c=${code}`;
+  return `${window.location.origin}${base}/verify/?t=${tenantId}&c=${code}`;
 }

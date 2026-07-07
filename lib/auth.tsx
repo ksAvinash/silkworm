@@ -48,7 +48,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       let token = await user.getIdTokenResult();
       let tenantId = (token.claims.tenantId as string) ?? null;
-      let isSuperAdmin = token.claims.superAdmin === true;
+      // token.superAdmin is the legacy claim shape, accepted during transition.
+      let isSuperAdmin = token.claims.role === 'superadmin' || token.claims.superAdmin === true;
 
       // No claims in the token yet — ask the syncClaims function to mirror
       // the recorded role (admins/superAdmins doc) into custom claims, then
@@ -59,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await httpsCallable(getFunctionsClient(), 'syncClaims')();
           token = await user.getIdTokenResult(true);
           tenantId = (token.claims.tenantId as string) ?? null;
-          isSuperAdmin = token.claims.superAdmin === true;
+          isSuperAdmin = token.claims.role === 'superadmin' || token.claims.superAdmin === true;
         } catch {
           // No role recorded for this account — leave claims empty.
         }
