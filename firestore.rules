@@ -13,18 +13,28 @@ service cloud.firestore {
       return signedIn() && request.auth.token.tenantId == tenantId;
     }
 
+    function tenantActive(tenantId) {
+      return get(/databases/$(database)/documents/tenants/$(tenantId)).data.status == 'active';
+    }
+
     // Tenant metadata: the tenant's own admin may read it and bump the
     // invoice counter; only the super admin creates/manages tenants.
     match /tenants/{tenantId} {
       allow read: if isTenantAdmin(tenantId) || isSuper();
       allow create: if isSuper();
-      allow update: if isSuper() || isTenantAdmin(tenantId);
+      // The tenant admin may only bump the invoice counter — never touch
+      // status/name/adminPhone (no self-unsuspending).
+      allow update: if isSuper()
+        || (isTenantAdmin(tenantId)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['invoiceSeq']));
       allow delete: if false;
 
       // All tenant-scoped data (breeds, batches, farmers, orders) is only
       // visible to that tenant's admin — multi-tenancy enforced here.
+      // Suspended tenants keep read access but cannot write anything.
       match /{subcollection}/{docId} {
-        allow read, write: if isTenantAdmin(tenantId);
+        allow read: if isTenantAdmin(tenantId);
+        allow write: if isTenantAdmin(tenantId) && tenantActive(tenantId);
       }
     }
 

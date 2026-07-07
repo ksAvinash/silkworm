@@ -73,7 +73,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </button>
         </div>
       </header>
-      <main className="container page-main">{children}</main>
+      <main className="container page-main">
+        {tenant?.status === 'suspended' ? (
+          <div className="empty" style={{ marginTop: 40 }}>
+            <p className="empty-title">This account is suspended</p>
+            <p className="muted">
+              Your Silkworm account has been suspended by the platform administrator. Your data
+              is safe, but booking and delivery actions are disabled. Please contact the
+              platform administrator to reactivate.
+            </p>
+          </div>
+        ) : (
+          children
+        )}
+      </main>
     </>
   );
 }

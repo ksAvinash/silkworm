@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { collection, doc, onSnapshot, orderBy, query, updateDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { firebaseReady, getDb, getFunctionsClient } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
@@ -59,6 +59,21 @@ export default function SuperAdminPage() {
     }
   };
 
+  const toggleStatus = async (t: Tenant) => {
+    const suspending = t.status === 'active';
+    if (
+      !confirm(
+        suspending
+          ? `Suspend “${t.name}”? Their admin keeps read access but can’t book, allocate, or deliver until reactivated.`
+          : `Reactivate “${t.name}”?`,
+      )
+    )
+      return;
+    await updateDoc(doc(getDb(), 'tenants', t.id), {
+      status: suspending ? 'suspended' : 'active',
+    });
+  };
+
   if (loading || !user || !isSuperAdmin) {
     return (
       <main className="center-page">
@@ -110,6 +125,7 @@ export default function SuperAdminPage() {
                   <th>Tenant</th>
                   <th>Admin phone</th>
                   <th>Status</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -121,6 +137,19 @@ export default function SuperAdminPage() {
                     <td>{t.adminPhone}</td>
                     <td>
                       <Badge tone={t.status === 'active' ? 'green' : 'red'}>{t.status}</Badge>
+                    </td>
+                    <td>
+                      <div className="actions">
+                        {t.status === 'active' ? (
+                          <button className="btn btn-danger btn-sm" onClick={() => toggleStatus(t)}>
+                            Suspend
+                          </button>
+                        ) : (
+                          <button className="btn btn-ghost btn-sm" onClick={() => toggleStatus(t)}>
+                            Reactivate
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
