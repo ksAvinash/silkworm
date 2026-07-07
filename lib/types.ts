@@ -6,6 +6,12 @@ export interface Tenant {
   adminPhone: string;
   status: 'active' | 'suspended';
   invoiceSeq?: number;
+  /** Invoice number prefix, e.g. "BCR-" → BCR-00001. Defaults to "INV-". */
+  invoicePrefix?: string;
+  /** Business address, shown on public verification pages. */
+  address?: string;
+  /** Public contact phone, shown on public verification pages. */
+  contactPhone?: string;
   createdAt?: Timestamp;
 }
 
@@ -61,6 +67,8 @@ export interface Order {
 export interface Verification {
   tenantId: string;
   tenantName: string;
+  tenantAddress?: string;
+  tenantContact?: string;
   invoiceNo: string;
   farmerName: string;
   batchLabel: string;

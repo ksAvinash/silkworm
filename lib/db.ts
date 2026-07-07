@@ -122,8 +122,10 @@ export async function deliverOrder(opts: {
   let invoiceNo = '';
   await runTransaction(db, async (tx) => {
     const t = await tx.get(tenantRef);
-    const seq = ((t.data()?.invoiceSeq as number) ?? 0) + 1;
-    invoiceNo = `INV-${String(seq).padStart(5, '0')}`;
+    const tenant = t.data() ?? {};
+    const seq = ((tenant.invoiceSeq as number) ?? 0) + 1;
+    const prefix = (tenant.invoicePrefix as string) || 'INV-';
+    invoiceNo = `${prefix}${String(seq).padStart(5, '0')}`;
     tx.update(tenantRef, { invoiceSeq: seq });
     tx.update(orderRef, {
       status: 'delivered',
@@ -134,6 +136,8 @@ export async function deliverOrder(opts: {
     tx.set(verifyRef, {
       tenantId: opts.tenantId,
       tenantName: opts.tenantName,
+      tenantAddress: (tenant.address as string) ?? '',
+      tenantContact: (tenant.contactPhone as string) ?? '',
       invoiceNo,
       farmerName: opts.order.farmerName,
       batchLabel: opts.order.batchLabel,

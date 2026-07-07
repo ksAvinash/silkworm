@@ -74,6 +74,18 @@ function VerifyContent() {
           <dt>Distributor</dt>
           <dd>{data.tenantName}</dd>
         </div>
+        {data.tenantAddress && (
+          <div className="detail-row">
+            <dt>Address</dt>
+            <dd>{data.tenantAddress}</dd>
+          </div>
+        )}
+        {data.tenantContact && (
+          <div className="detail-row">
+            <dt>Contact</dt>
+            <dd>{data.tenantContact}</dd>
+          </div>
+        )}
         <div className="detail-row">
           <dt>Farmer</dt>
           <dd>{data.farmerName}</dd>

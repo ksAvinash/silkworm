@@ -30,11 +30,16 @@ service cloud.firestore {
     match /tenants/{tenantId} {
       allow read: if isTenantAdmin(tenantId) || isSuper();
       allow create: if isSuper();
-      // The tenant admin may only bump the invoice counter — never touch
-      // status/name/adminPhone (no self-unsuspending).
+      // The tenant admin may bump the invoice counter and edit their own
+      // preferences — never status (no self-unsuspending) or adminPhone
+      // (account identity). Preference edits require an active tenant.
       allow update: if isSuper()
         || (isTenantAdmin(tenantId)
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['invoiceSeq']));
+            && resource.data.status == 'active'
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['invoiceSeq', 'name', 'invoicePrefix', 'address', 'contactPhone'])
+            && request.resource.data.name is string
+            && request.resource.data.name.size() > 0);
       allow delete: if false;
 
       // Public invoice-verification snapshots. Direct GET by code only (the
