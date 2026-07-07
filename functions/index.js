@@ -3,6 +3,9 @@ const admin = require('firebase-admin');
 
 admin.initializeApp();
 
+// Must match FUNCTIONS_REGION in lib/firebase.ts.
+const REGION = 'asia-south1';
+
 /**
  * Onboard a new tenant (super admin only).
  *
@@ -10,7 +13,7 @@ admin.initializeApp();
  * the tenant admin's phone number, sets the `tenantId` custom claim on that
  * user, and registers them in /admins.
  */
-exports.onboardTenant = onCall(async (request) => {
+exports.onboardTenant = onCall({ region: REGION }, async (request) => {
   if (request.auth?.token?.superAdmin !== true) {
     throw new HttpsError('permission-denied', 'Only the platform super admin can onboard tenants.');
   }
@@ -53,4 +56,42 @@ exports.onboardTenant = onCall(async (request) => {
   });
 
   return { tenantId: tenantRef.id };
+});
+
+/**
+ * Mirror the caller's recorded role into their auth custom claims.
+ *
+ * /superAdmins/{uid} → { superAdmin: true }; otherwise /admins/{uid} →
+ * { tenantId }. Both collections are Admin-SDK-only (client writes are
+ * denied by Firestore rules), so they're safe to trust as the role source.
+ * Lets a super admin bootstrap their claim from a console-created doc, and
+ * heals tokens when claims were set after the user signed in.
+ */
+exports.syncClaims = onCall({ region: REGION }, async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError('unauthenticated', 'Sign in first.');
+  }
+  const uid = request.auth.uid;
+  const db = admin.firestore();
+
+  let claims = null;
+  const superDoc = await db.collection('superAdmins').doc(uid).get();
+  if (superDoc.exists) {
+    claims = { superAdmin: true };
+  } else {
+    const adminDoc = await db.collection('admins').doc(uid).get();
+    const tenantId = adminDoc.exists ? adminDoc.data().tenantId : null;
+    if (tenantId) claims = { tenantId };
+  }
+  if (!claims) {
+    throw new HttpsError('permission-denied', 'No admin role is recorded for this account.');
+  }
+
+  const user = await admin.auth().getUser(uid);
+  const current = user.customClaims || {};
+  const drifted = Object.entries(claims).some(([key, value]) => current[key] !== value);
+  if (drifted) {
+    await admin.auth().setCustomUserClaims(uid, { ...current, ...claims });
+  }
+  return { ok: true, claims };
 });

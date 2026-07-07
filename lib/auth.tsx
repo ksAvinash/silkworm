@@ -1,8 +1,9 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { onAuthStateChanged, signOut as fbSignOut, type User } from 'firebase/auth';
-import { firebaseReady, getFirebaseAuth } from './firebase';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { onIdTokenChanged, signOut as fbSignOut, type User } from 'firebase/auth';
+import { httpsCallable } from 'firebase/functions';
+import { firebaseReady, getFirebaseAuth, getFunctionsClient } from './firebase';
 
 interface AuthState {
   loading: boolean;
@@ -32,21 +33,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isSuperAdmin: false,
   });
 
+  // uid we already tried syncClaims for, so a role-less account doesn't
+  // retry the callable on every token refresh.
+  const syncTriedFor = useRef<string | null>(null);
+
   useEffect(() => {
     if (!firebaseReady) return;
     const auth = getFirebaseAuth();
-    return onAuthStateChanged(auth, async (user) => {
+    return onIdTokenChanged(auth, async (user) => {
       if (!user) {
+        syncTriedFor.current = null;
         setState({ loading: false, user: null, tenantId: null, isSuperAdmin: false });
         return;
       }
-      const token = await user.getIdTokenResult();
-      setState({
-        loading: false,
-        user,
-        tenantId: (token.claims.tenantId as string) ?? null,
-        isSuperAdmin: token.claims.superAdmin === true,
-      });
+      let token = await user.getIdTokenResult();
+      let tenantId = (token.claims.tenantId as string) ?? null;
+      let isSuperAdmin = token.claims.superAdmin === true;
+
+      // No claims in the token yet — ask the syncClaims function to mirror
+      // the recorded role (admins/superAdmins doc) into custom claims, then
+      // force-refresh the token to pick them up.
+      if (!tenantId && !isSuperAdmin && syncTriedFor.current !== user.uid) {
+        syncTriedFor.current = user.uid;
+        try {
+          await httpsCallable(getFunctionsClient(), 'syncClaims')();
+          token = await user.getIdTokenResult(true);
+          tenantId = (token.claims.tenantId as string) ?? null;
+          isSuperAdmin = token.claims.superAdmin === true;
+        } catch {
+          // No role recorded for this account — leave claims empty.
+        }
+      }
+
+      setState({ loading: false, user, tenantId, isSuperAdmin });
     });
   }, []);
 

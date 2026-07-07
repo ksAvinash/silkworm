@@ -1,6 +1,10 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
+import { getFunctions, type Functions } from 'firebase/functions';
+
+// Must match REGION in functions/index.js.
+export const FUNCTIONS_REGION = 'asia-south1';
 
 const config = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -27,4 +31,9 @@ export function getFirebaseAuth(): Auth {
 export function getDb(): Firestore {
   if (!app) throw new Error('Firebase is not configured. Copy .env.local.example to .env.local and fill it in.');
   return getFirestore(app);
+}
+
+export function getFunctionsClient(): Functions {
+  if (!app) throw new Error('Firebase is not configured. Copy .env.local.example to .env.local and fill it in.');
+  return getFunctions(app, FUNCTIONS_REGION);
 }

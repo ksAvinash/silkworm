@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { firebaseReady, getDb } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { firebaseReady, getDb, getFunctionsClient } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import type { Tenant } from '@/lib/types';
 import { Badge, EmptyState, ErrorNote, Field, Logo, Modal, Spinner } from '@/components/ui';
@@ -44,7 +44,7 @@ export default function SuperAdminPage() {
     try {
       // Onboarding needs the Admin SDK (creates the admin user and sets the
       // tenantId custom claim), so it runs in the onboardTenant Cloud Function.
-      const fn = httpsCallable(getFunctions(), 'onboardTenant');
+      const fn = httpsCallable(getFunctionsClient(), 'onboardTenant');
       await fn({ name: form.name.trim(), adminPhone: form.adminPhone.trim() });
       setCreating(false);
       setForm({ name: '', adminPhone: '+91' });
