@@ -7,7 +7,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { getDb } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import { bookOrder, cancelOrder, deliverOrder, useTenantCollection, verifyUrl } from '@/lib/db';
-import { batchLabel, type Batch, type Farmer, type Order, type Tenant } from '@/lib/types';
+import { batchLabel, inr, type Batch, type Breed, type Farmer, type Order, type Tenant } from '@/lib/types';
 import { Badge, EmptyState, ErrorNote, Field, Modal, Spinner } from '@/components/ui';
 
 const STATUS_TONE = { booked: 'amber', allocated: 'blue', delivered: 'green' } as const;
@@ -26,6 +26,7 @@ function OrdersContent() {
   const batchFilter = useSearchParams().get('batch');
   const [orders, loading] = useTenantCollection<Order>(tenantId, 'orders');
   const [batches] = useTenantCollection<Batch>(tenantId, 'batches');
+  const [breeds] = useTenantCollection<Breed>(tenantId, 'breeds');
   const [farmers] = useTenantCollection<Farmer>(tenantId, 'farmers');
   const [tenantName, setTenantName] = useState('');
   const [booking, setBooking] = useState(false);
@@ -56,6 +57,7 @@ function OrdersContent() {
       await bookOrder({
         tenantId,
         batch,
+        breed: breeds.find((br) => br.id === batch.breedId),
         farmer,
         quantity: Number(form.quantity),
         batchLabel: batchLabel(batch),
@@ -113,6 +115,13 @@ function OrdersContent() {
   const remaining = selectedBatch
     ? selectedBatch.quantity - selectedBatch.bookedTotal
     : undefined;
+  const selectedPrice = selectedBatch
+    ? breeds.find((br) => br.id === selectedBatch.breedId)?.sellingPrice
+    : undefined;
+  const estimate =
+    selectedPrice != null && Number(form.quantity) > 0
+      ? inr(Number(form.quantity) * selectedPrice)
+      : null;
 
   return (
     <>
@@ -293,7 +302,9 @@ function OrdersContent() {
                 label="Quantity"
                 hint={
                   remaining !== undefined
-                    ? `${remaining.toLocaleString()} remaining on this batch`
+                    ? `${remaining.toLocaleString()} remaining on this batch${
+                        estimate ? ` · order value ${estimate}` : ''
+                      }`
                     : undefined
                 }
               >
@@ -324,6 +335,8 @@ function OrdersContent() {
               <strong>{invoiceFor.farmerName}</strong>
               <div className="muted">
                 {invoiceFor.batchLabel} · {invoiceFor.quantity.toLocaleString()} qty
+                {(invoiceFor.unitPrice ?? 0) > 0 &&
+                  ` · ${inr(invoiceFor.quantity * invoiceFor.unitPrice!)}`}
               </div>
             </div>
             <p className="muted">

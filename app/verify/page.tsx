@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { doc, getDoc } from 'firebase/firestore';
 import { firebaseReady, getDb } from '@/lib/firebase';
-import type { Verification } from '@/lib/types';
+import { inr, type Verification } from '@/lib/types';
 import { Logo, Spinner } from '@/components/ui';
 
 function VerifyContent() {
@@ -98,6 +98,12 @@ function VerifyContent() {
           <dt>Quantity</dt>
           <dd>{data.quantity.toLocaleString()}</dd>
         </div>
+        {(data.amount ?? 0) > 0 && (
+          <div className="detail-row">
+            <dt>Amount</dt>
+            <dd>{inr(data.amount!)}</dd>
+          </div>
+        )}
         <div className="detail-row">
           <dt>Status</dt>
           <dd>Delivered</dd>

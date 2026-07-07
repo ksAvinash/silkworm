@@ -12,14 +12,20 @@ import {
 import { getDb } from '@/lib/firebase';
 import { useAuth } from '@/lib/auth';
 import { useTenantCollection } from '@/lib/db';
-import type { Breed } from '@/lib/types';
+import { inr, type Breed } from '@/lib/types';
 import { EmptyState, ErrorNote, Field, Modal, Spinner } from '@/components/ui';
 
 export default function BreedsPage() {
   const { tenantId } = useAuth();
   const [breeds, loading] = useTenantCollection<Breed>(tenantId, 'breeds');
   const [editing, setEditing] = useState<Breed | 'new' | null>(null);
-  const [form, setForm] = useState({ name: '', code: '', notes: '' });
+  const [form, setForm] = useState({
+    name: '',
+    code: '',
+    purchasePrice: '',
+    sellingPrice: '',
+    notes: '',
+  });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -28,8 +34,14 @@ export default function BreedsPage() {
     setError(null);
     setForm(
       breed === 'new'
-        ? { name: '', code: '', notes: '' }
-        : { name: breed.name, code: breed.code, notes: breed.notes ?? '' },
+        ? { name: '', code: '', purchasePrice: '', sellingPrice: '', notes: '' }
+        : {
+            name: breed.name,
+            code: breed.code,
+            purchasePrice: breed.purchasePrice != null ? String(breed.purchasePrice) : '',
+            sellingPrice: breed.sellingPrice != null ? String(breed.sellingPrice) : '',
+            notes: breed.notes ?? '',
+          },
     );
   };
 
@@ -39,7 +51,13 @@ export default function BreedsPage() {
     setBusy(true);
     setError(null);
     try {
-      const data = { name: form.name.trim(), code: form.code.trim(), notes: form.notes.trim() };
+      const data = {
+        name: form.name.trim(),
+        code: form.code.trim(),
+        purchasePrice: form.purchasePrice ? Number(form.purchasePrice) : null,
+        sellingPrice: form.sellingPrice ? Number(form.sellingPrice) : null,
+        notes: form.notes.trim(),
+      };
       if (editing === 'new') {
         await addDoc(collection(getDb(), 'tenants', tenantId, 'breeds'), {
           ...data,
@@ -85,6 +103,8 @@ export default function BreedsPage() {
               <tr>
                 <th>Name</th>
                 <th>Code</th>
+                <th>Purchase ₹</th>
+                <th>Selling ₹</th>
                 <th>Notes</th>
                 <th />
               </tr>
@@ -94,6 +114,8 @@ export default function BreedsPage() {
                 <tr key={b.id}>
                   <td>{b.name}</td>
                   <td>{b.code}</td>
+                  <td>{b.purchasePrice != null ? inr(b.purchasePrice) : <span className="muted">—</span>}</td>
+                  <td>{b.sellingPrice != null ? inr(b.sellingPrice) : <span className="muted">—</span>}</td>
                   <td className="muted">{b.notes || '—'}</td>
                   <td>
                     <div className="actions">
@@ -135,6 +157,28 @@ export default function BreedsPage() {
                 required
               />
             </Field>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label="Purchase price ₹ / unit" hint="What you pay per egg">
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.purchasePrice}
+                  onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })}
+                />
+              </Field>
+              <Field label="Selling price ₹ / unit" hint="What a farmer pays per egg">
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.sellingPrice}
+                  onChange={(e) => setForm({ ...form, sellingPrice: e.target.value })}
+                />
+              </Field>
+            </div>
             <Field label="Notes (optional)">
               <textarea
                 className="input"

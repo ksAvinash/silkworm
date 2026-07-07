@@ -12,7 +12,7 @@ import {
   increment,
 } from 'firebase/firestore';
 import { firebaseReady, getDb } from './firebase';
-import type { Batch, Farmer, Order } from './types';
+import type { Batch, Breed, Farmer, Order } from './types';
 
 /**
  * Live-subscribe to a tenant subcollection, newest first.
@@ -51,6 +51,8 @@ export function useTenantCollection<T extends { id: string }>(
 export async function bookOrder(opts: {
   tenantId: string;
   batch: Batch;
+  /** The batch's breed, if loaded — its prices are snapshotted onto the order. */
+  breed?: Breed;
   farmer: Farmer;
   quantity: number;
   batchLabel: string;
@@ -77,6 +79,8 @@ export async function bookOrder(opts: {
       batchId: opts.batch.id,
       batchLabel: opts.batchLabel,
       quantity: opts.quantity,
+      unitPrice: opts.breed?.sellingPrice ?? 0,
+      unitCost: opts.breed?.purchasePrice ?? 0,
       status: 'booked',
       bookedBy: opts.adminUid,
       createdAt: serverTimestamp(),
@@ -142,6 +146,7 @@ export async function deliverOrder(opts: {
       farmerName: opts.order.farmerName,
       batchLabel: opts.order.batchLabel,
       quantity: opts.order.quantity,
+      amount: opts.order.quantity * (opts.order.unitPrice ?? 0),
       status: 'delivered',
       createdAt: serverTimestamp(),
     });

@@ -19,6 +19,10 @@ export interface Breed {
   id: string;
   name: string;
   code: string;
+  /** What you pay per unit (egg/DFL), ₹ — feeds cost & margin in reports. */
+  purchasePrice?: number | null;
+  /** What a farmer pays per unit, ₹ — feeds booking value and invoices. */
+  sellingPrice?: number | null;
   notes?: string;
   createdAt?: Timestamp;
 }
@@ -56,6 +60,9 @@ export interface Order {
   batchId: string;
   batchLabel: string; // e.g. "SCR — 5000 qty — 2026-07-20"
   quantity: number;
+  /** Breed prices snapshotted at booking time, so later edits don't rewrite history. */
+  unitPrice?: number;
+  unitCost?: number;
   status: OrderStatus;
   invoiceNo?: string;
   verifyCode?: string;
@@ -73,8 +80,15 @@ export interface Verification {
   farmerName: string;
   batchLabel: string;
   quantity: number;
+  /** Invoice total (quantity × unit price), 0 when the breed had no price. */
+  amount?: number;
   status: OrderStatus;
   createdAt?: Timestamp;
+}
+
+/** Format a number as Indian rupees, e.g. 12345.5 → "₹12,345.50". */
+export function inr(n: number): string {
+  return '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
 export function batchLabel(b: Pick<Batch, 'breedName' | 'quantity' | 'availableDate'>): string {
