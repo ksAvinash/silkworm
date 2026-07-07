@@ -70,7 +70,7 @@ multiple different tenants.
 
 | Page | Access | Description |
 |---|---|---|
-| Home | Public | Introduction to the platform |
+| Home (landing) | Public | Product marketing page: what Silkworm is and its key features (catalog, batch booking, invoicing/QR verification, reporting), aimed at rearers considering the tool; since tenant sign-up isn't self-service yet, includes a way to request access |
 | Login | Public | Admin authentication via phone number OTP |
 | Admin dashboard | Admin (tenant) | Manage breeds, create/allocate batches, manage farmer profiles, book on a farmer's behalf, mark deliveries |
 | Reports | Admin (tenant) | Distribution and batch reporting for their tenant |
