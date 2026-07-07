@@ -67,7 +67,9 @@ export default function HomePage() {
       <main>
         <section className="hero">
           <span className="eyebrow">For silkworm-rearing distributors</span>
-          <h1>Run your egg distribution from catalog to delivery</h1>
+          <h1>
+            Run your egg distribution from <em>catalog</em> to <em>delivery</em>
+          </h1>
           <p className="lede">
             Silkworm manages your breed catalog, batch pre-bookings, farmer profiles, and
             deliveries — with QR-verified invoices your farmers and delivery agents can trust.
@@ -80,10 +82,16 @@ export default function HomePage() {
               See how it works
             </a>
           </div>
+          <div className="hero-points">
+            <span>Booking caps enforced automatically</span>
+            <span>QR-verified invoices</span>
+            <span>Works on any phone</span>
+          </div>
         </section>
 
         <section className="section section-alt" id="features">
           <div className="container">
+            <span className="section-eyebrow">Features</span>
             <h2>Everything a rearer needs to distribute eggs</h2>
             <p className="section-sub">
               Purpose-built for the way egg distribution actually works: pre-bookings over the
@@ -105,6 +113,7 @@ export default function HomePage() {
 
         <section className="section" id="how-it-works">
           <div className="container">
+            <span className="section-eyebrow">Workflow</span>
             <h2>How it works</h2>
             <p className="section-sub">
               Three steps from a new production batch to a verified delivery.
