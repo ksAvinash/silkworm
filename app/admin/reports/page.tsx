@@ -2,8 +2,23 @@
 
 import { useAuth } from '@/lib/auth';
 import { useTenantCollection } from '@/lib/db';
+import { downloadCsv, type CsvColumn } from '@/lib/csv';
 import { batchLabel, type Batch, type Farmer, type Order } from '@/lib/types';
 import { EmptyState, Spinner, StatCard } from '@/components/ui';
+import type { Timestamp } from 'firebase/firestore';
+
+const asDate = (ts?: Timestamp) => (ts ? ts.toDate().toISOString().slice(0, 10) : '');
+
+const BOOKING_CSV: CsvColumn<Order>[] = [
+  { header: 'Invoice', value: (o) => o.invoiceNo ?? '' },
+  { header: 'Farmer', value: (o) => o.farmerName },
+  { header: 'Farmer phone', value: (o) => o.farmerPhone },
+  { header: 'Batch', value: (o) => o.batchLabel },
+  { header: 'Quantity', value: (o) => o.quantity },
+  { header: 'Status', value: (o) => o.status },
+  { header: 'Booked on', value: (o) => asDate(o.createdAt) },
+  { header: 'Delivered on', value: (o) => asDate(o.deliveredAt) },
+];
 
 export default function ReportsPage() {
   const { tenantId } = useAuth();
@@ -43,6 +58,19 @@ export default function ReportsPage() {
     <>
       <div className="page-head">
         <h1>Reports</h1>
+        <button
+          className="btn btn-ghost"
+          disabled={orders.length === 0}
+          onClick={() =>
+            downloadCsv(
+              `silkworm-bookings-${new Date().toISOString().slice(0, 10)}.csv`,
+              BOOKING_CSV,
+              orders,
+            )
+          }
+        >
+          ⬇ Export bookings CSV
+        </button>
       </div>
 
       <div className="stat-grid">

@@ -17,6 +17,9 @@ interface AuthContextValue extends AuthState {
   signOut: () => Promise<void>;
 }
 
+const SESSION_KEY = 'silkworm_session_expiry';
+const SESSION_MS = 7 * 24 * 60 * 60 * 1000; // auto sign-out after 7 days
+
 const AuthContext = createContext<AuthContextValue>({
   loading: true,
   user: null,
@@ -43,9 +46,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return onIdTokenChanged(auth, async (user) => {
       if (!user) {
         syncTriedFor.current = null;
+        localStorage.removeItem(SESSION_KEY);
         setState({ loading: false, user: null, tenantId: null, isSuperAdmin: false });
         return;
       }
+
+      // Session cap: force sign-out 7 days after the original sign-in.
+      const expiry = Number(localStorage.getItem(SESSION_KEY) ?? 0);
+      if (!expiry) {
+        localStorage.setItem(SESSION_KEY, String(Date.now() + SESSION_MS));
+      } else if (Date.now() > expiry) {
+        localStorage.removeItem(SESSION_KEY);
+        await fbSignOut(auth);
+        return;
+      }
+
       let token = await user.getIdTokenResult();
       let tenantId = (token.claims.tenantId as string) ?? null;
       // token.superAdmin is the legacy claim shape, accepted during transition.
