@@ -9,16 +9,6 @@ import { firebaseReady, getDb } from '@/lib/firebase';
 import type { Tenant } from '@/lib/types';
 import { Logo, Spinner } from '@/components/ui';
 
-const NAV = [
-  { href: '/admin/', label: 'Dashboard' },
-  { href: '/admin/batches/', label: 'Batches' },
-  { href: '/admin/orders/', label: 'Bookings' },
-  { href: '/admin/farmers/', label: 'Farmers' },
-  { href: '/admin/breeds/', label: 'Breeds' },
-  { href: '/admin/reports/', label: 'Reports' },
-  { href: '/admin/settings/', label: 'Settings' },
-];
-
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { loading, user, tenantId, signOut } = useAuth();
   const router = useRouter();
@@ -51,17 +41,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/admin/" className="brand">
             <Logo /> {tenant?.name ?? 'Silkworm'}
           </Link>
-          <nav className="nav-links" aria-label="Admin">
-            {NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`nav-link${pathname === item.href ? ' active' : ''}`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          {pathname !== '/admin/' && (
+            <Link href="/admin/" className="nav-link">
+              ← Dashboard
+            </Link>
+          )}
           <span className="topbar-spacer" />
           <button
             className="btn btn-ghost btn-sm"
