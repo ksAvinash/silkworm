@@ -10,23 +10,36 @@ Built with [Next.js](https://nextjs.org/), statically exported and hosted on
 
 ## Overview
 
-Egg distributors ("admins") maintain a catalog of silkworm egg breeds and
-production batches. A batch only accepts pre-bookings once an admin opens it
-for booking. Farmers can pre-book eggs from an open batch either by signing
-in themselves, or over a phone call — in which case an admin books on their
-behalf. Admins allocate each batch across pre-booked farmers and track
-delivery status through to completion. Every completed order generates an
-invoice with a unique QR code that links to a public, read-only verification
-page — so anyone (e.g. a delivery agent) can confirm an order's authenticity
-without signing in.
+Silkworm is **multi-tenant**: each tenant is a silkworm-rearing admin
+(distributor) running their own independent operation — their own breeds,
+batches, farmers, and orders, isolated from every other tenant. Tenants are
+onboarded by a platform super-admin.
+
+Within a tenant, the admin maintains a catalog of silkworm egg breeds and
+production batches. A batch only accepts pre-bookings once the admin opens it
+for booking. In this first release, farmers do not sign in — all pre-booking
+happens over a phone call, with the admin booking on the farmer's behalf and
+maintaining their profile. The admin allocates each batch across pre-booked
+farmers and tracks delivery status through to completion. Every completed
+order generates an invoice with a unique QR code that links to a public,
+read-only verification page — so anyone (e.g. a delivery agent) can confirm
+an order's authenticity without signing in.
+
+Because farmer records are per-tenant, the same real-world farmer (e.g. same
+phone number) can have an independent profile and order history with
+multiple different tenants.
 
 ## Roles
 
-- **Admin (distributor)** — manages breeds, opens batches for booking,
-  books on behalf of farmers who call in, allocates batches, marks orders as
-  delivered, views reporting/dashboard.
-- **Farmer** — signs in, maintains their profile, browses open batches,
-  pre-books eggs, views their own orders and invoices.
+- **Super admin (platform)** — onboards and manages tenants; no visibility
+  into a tenant's day-to-day catalog/batch data beyond what's needed to
+  administer the platform.
+- **Admin (tenant / rearer)** — scoped to their own tenant only; manages
+  breeds, opens batches for booking, books on behalf of farmers who call in,
+  maintains farmer profiles, allocates batches, marks orders as delivered,
+  views their tenant's reporting/dashboard.
+- **Farmer** — no login in this release. Profile and bookings are entered
+  and maintained by the tenant admin on the farmer's behalf.
 
 ## Features
 
@@ -36,10 +49,13 @@ without signing in.
 - **Booking cap** — total pre-booked quantity against a batch cannot exceed
   its stated quantity (e.g. a 5000-qty batch stops accepting bookings once
   5000 is reached).
-- **Pre-booking, two ways** — farmers pre-book themselves via login, or call
-  in and have an admin book on their behalf.
+- **Phone-in pre-booking** — farmers call in; the tenant admin books on their
+  behalf (no farmer login in this release).
 - **Farmer profiles** — name, address, location link (e.g. maps pin), photo,
-  and other fields useful for delivery/verification.
+  and other fields useful for delivery/verification, scoped to the tenant
+  that maintains them.
+- **Multi-tenancy** — each rearer/admin operates in an isolated tenant with
+  their own breeds, batches, farmers, and orders.
 - **Batch lifecycle** — batch opened → allocate to pre-booked farmers →
   deliver.
 - **Invoicing** — per-order invoice with a unique QR code.
@@ -48,19 +64,17 @@ without signing in.
 - **Reporting dashboard** — distribution totals, per-farmer history, and
   batch-level stats.
 - **Mobile-friendly** — responsive UI throughout, since admins often book on
-  behalf of farmers over the phone while away from a desk, and farmers
-  primarily browse/book from their phones.
+  behalf of farmers over the phone while away from a desk.
 
 ## Pages
 
 | Page | Access | Description |
 |---|---|---|
 | Home | Public | Introduction to the platform |
-| Login / Sign up | Public | Farmer and admin authentication via phone number OTP |
-| Catalog | Signed-in farmers | Browse breeds and upcoming batches |
-| Farmer dashboard | Signed-in farmers | Pre-book eggs, view own orders/invoices |
-| Admin dashboard | Admin | Manage breeds, create/allocate batches, mark deliveries |
-| Reports | Admin | Distribution and batch reporting |
+| Login | Public | Admin authentication via phone number OTP |
+| Admin dashboard | Admin (tenant) | Manage breeds, create/allocate batches, manage farmer profiles, book on a farmer's behalf, mark deliveries |
+| Reports | Admin (tenant) | Distribution and batch reporting for their tenant |
+| Tenant management | Super admin | Onboard/manage tenants |
 | Order verification | Public (via QR) | Read-only invoice/order details |
 
 ## Tech stack
@@ -69,11 +83,12 @@ without signing in.
   from GitHub Pages
 - **Responsive design** — mobile-first layout so admins and farmers can use
   the full booking/allocation workflow from a phone
-- **Firebase Cloud Firestore** — catalog, batches, orders/allocations
-- **Firebase Authentication** — phone number + OTP sign-in for farmers and
-  admins (no Google/social sign-in)
+- **Firebase Cloud Firestore** — multi-tenant catalog, batches, farmers, and
+  orders/allocations
+- **Firebase Authentication** — phone number + OTP sign-in for admins and the
+  super admin (no Google/social sign-in; no farmer login in this release)
 - **Firebase Cloud Functions** — server-side logic that can't run on a static
-  host (e.g. invoice number generation, notifications)
+  host (e.g. tenant onboarding, invoice number generation, notifications)
 
 ## Architecture note
 
@@ -83,6 +98,12 @@ Firebase JS SDK, secured with Firestore security rules. Any logic that must
 run server-side (e.g. sensitive writes, invoice generation) is implemented as
 a Firebase Cloud Function, deployed and hosted separately from the static
 site — the two are decoupled but share the same Firebase project.
+
+**Multi-tenancy** is enforced at the data layer: each admin is tagged with a
+`tenantId` (via a Firebase custom claim, set when the super admin creates the
+tenant), and Firestore security rules restrict every read/write to documents
+under that admin's own `/tenants/{tenantId}` subtree. The super admin's
+claim allows tenant-management operations only, not access to tenant data.
 
 ## Getting started
 
@@ -129,16 +150,40 @@ firebase deploy --only functions
 
 ## Data model (Firestore)
 
-- `breeds` — egg breed/variety metadata (e.g. "SCR")
-- `batches` — production batches: breed, quantity, date (e.g. "SCR Eggs —
-  5000 qty — 20th July"), booking status (closed/open), running total
-  booked (capped at quantity), allocation, delivery status
-- `orders` — a farmer's pre-booking against an open batch (allocation,
-  delivery status, invoice/QR reference, booked-via login-or-phone +
-  booked-by admin if phone)
-- `farmers` — farmer profile (name, address, location link, photo, contact
-  info), keyed by Firebase Auth UID where the farmer has an account
-- `users` — admin accounts, keyed by Firebase Auth UID
+Tenant-scoped data lives under `/tenants/{tenantId}/...` subcollections so
+each rearer's data is isolated by construction:
+
+- `tenants/{tenantId}` — tenant metadata (rearer/business name, admin contact,
+  created-by super admin, status)
+- `tenants/{tenantId}/breeds` — egg breed/variety metadata (e.g. "SCR")
+- `tenants/{tenantId}/batches` — production batches: breed, quantity, date
+  (e.g. "SCR Eggs — 5000 qty — 20th July"), booking status (closed/open),
+  running total booked (capped at quantity), allocation, delivery status
+- `tenants/{tenantId}/farmers` — farmer profile (name, address, location
+  link, photo, contact info), entered/maintained by the tenant admin
+- `tenants/{tenantId}/orders` — a farmer's phone-in pre-booking against an
+  open batch (allocation, delivery status, invoice/QR reference, which admin
+  booked it)
+
+Platform-level (non-tenant-scoped) data:
+
+- `admins` — tenant admin accounts, keyed by Firebase Auth UID, each tagged
+  with the `tenantId` they belong to
+- `superAdmins` — platform super-admin accounts, keyed by Firebase Auth UID
+
+## Roadmap (future releases)
+
+This first release is admin-only: tenant admins run their whole operation
+(catalog, batches, farmer profiles, phone-in bookings) without any farmer
+login. Planned for later releases:
+
+- **Farmer login** — farmers sign in themselves (phone OTP) instead of
+  everything being entered by the admin.
+- **Self-service pre-booking** — farmers browse open batches and pre-book
+  directly, rather than calling the admin in.
+- **Paid bookings via payment gateway** — farmers pay to confirm a
+  pre-booking, with a payment gateway integration sitting between farmer and
+  rearer admin to handle the transaction.
 
 ## License
 
